@@ -1,68 +1,45 @@
-# Feed-Forward Neural Language Model
+# Feed-forward neural language model
 
-A fixed-context next-word predictor implemented in PyTorch, with reusable training and inference code, safe JSON vocabulary metadata, and a Streamlit demo.
-
-This began as coursework for ES 335: Machine Learning at IIT Gandhinagar. It is presented as an educational language-model implementation—not as an RNN, Transformer, or research contribution.
-
-## Model
-
-Given the five most recent words, the model embeds each token and predicts a distribution over the vocabulary:
+I built this fixed-context word predictor for ES 335: Machine Learning at IIT Gandhinagar. It is a small PyTorch model rather than an RNN or Transformer: the previous five words are embedded, concatenated, and passed through a two-layer MLP to predict the next word.
 
 ```text
-5 token IDs → 64-D embeddings → flatten → Linear(320, 128)
-            → ReLU → Linear(128, vocabulary size) → logits
+5 token IDs -> 64-D embeddings -> flatten -> Linear(320, 128)
+            -> ReLU -> Linear(128, vocabulary size)
 ```
 
-For context tokens \(x_1, \ldots, x_5\), the forward pass is
+The bundled checkpoint was trained on preprocessed Sherlock Holmes text with a vocabulary of 8,040 tokens. In the original ten-epoch notebook run, training loss fell from 6.9704 to 2.8452. I did not record a validation score for that checkpoint, so I treat this only as a training result.
 
-\[
-p(x_6 \mid x_1, \ldots, x_5)
-= \operatorname{softmax}\!\left(W_2\,\operatorname{ReLU}
-\left(W_1 [E(x_1);\ldots;E(x_5)] + b_1\right)+b_2\right).
-\]
-
-The included checkpoint was trained on preprocessed Sherlock Holmes text with an 8,040-token vocabulary, Adam, and cross-entropy loss. The recorded training loss in the original notebook decreased from **6.9704 to 2.8452** over 10 epochs. That run did not record a validation metric, so the training loss should not be read as a generalization result.
-
-## What is reusable now
-
-- `model.py` — model, JSON metadata validation, preprocessing, and greedy/temperature/top-k decoding
-- `train.py` — configurable training with a contiguous train/validation split and validation perplexity
-- `generate.py` — command-line inference
-- `app.py` — Streamlit interface for the included checkpoint
-- `metadata.json` — non-executable vocabulary and architecture metadata
-- `model.pth` — state-dict-only checkpoint from the original experiment
-- `Task1_training.ipynb` — original experiment and embedding visualization
-
-The original `variables.pkl` is retained for history, but the application and command-line tools do **not** load it. Only use checkpoints and metadata from sources you trust.
-
-## Setup
-
-Python 3.10 or newer is recommended.
+## Try the included model
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-## Inference
-
-Run the included model from the terminal:
-
-```bash
 python generate.py "sherlock holmes looked into" --num-words 12 --greedy
-python generate.py "sherlock holmes looked into" --num-words 12 --top-k 20 --temperature 0.8
+python generate.py "sherlock holmes looked into" \
+  --num-words 12 --top-k 20 --temperature 0.8 --seed 42
 ```
 
-Or launch the interactive demo:
+The bundled checkpoint produces:
+
+```text
+# greedy
+sherlock holmes looked into the air the gang the ceiling and was the key between the
+
+# top-k, temperature 0.8, seed 42
+sherlock holmes looked into the air post being silence bridge was the copper beeches child down
+```
+
+The rough phrasing is expected from a five-word feed-forward model trained on a small corpus. Greedy decoding is deterministic; top-k sampling is more varied and can be reproduced with `--seed`.
+
+To use the Streamlit interface:
 
 ```bash
 streamlit run app.py
 ```
 
-Greedy decoding is deterministic. Top-k decoding samples only from the highest-scoring \(k\) words; temperature controls how concentrated that distribution is.
-
-## Train on another corpus
+## Train on another text file
 
 ```bash
 python train.py path/to/corpus.txt \
@@ -77,17 +54,17 @@ python generate.py "your starting phrase" \
   --metadata artifacts/metadata.json
 ```
 
-The script builds its vocabulary from the training portion only, reserves distinct padding and unknown-word tokens, reports held-out loss and perplexity each epoch, and saves the best validation checkpoint. The split is contiguous so validation windows do not duplicate training windows.
+The training script builds the vocabulary from the training split, keeps padding and unknown-word tokens separate, reports validation loss and perplexity, and saves the best validation checkpoint. I use a contiguous split so that validation windows are not duplicates of training windows.
 
-## Reproducibility and limitations
+## Files
 
-- Seeds are applied to Python and PyTorch; exact floating-point results can still vary across hardware and PyTorch versions.
-- The source text used for the included checkpoint is not stored in this repository, so that historical run cannot be reproduced exactly from the repository alone.
-- A five-word feed-forward model has no recurrent state or self-attention. It cannot represent dependencies outside its fixed context window.
-- The original text preprocessing removes punctuation and words shorter than three characters, which limits fluency and discards useful syntax.
-- The included checkpoint is small and intended to demonstrate the mechanics of embeddings, context windows, training, and decoding—not modern language-model quality.
+- `model.py`: model definition, preprocessing, metadata checks, and decoding
+- `train.py`: training and validation CLI
+- `generate.py`: command-line generation
+- `app.py`: Streamlit interface
+- `metadata.json`: vocabulary and architecture settings for `model.pth`
+- `Task1_training.ipynb`: original training and embedding-visualization notebook
 
-## Other retained coursework
+`variables.pkl` is kept only with the original submission; none of the current scripts load it. The historical corpus is not in the repository, so the included checkpoint cannot be retrained exactly from these files alone.
 
-- `ml_assignment3_part2.ipynb` compares unregularized, L1-regularized, and L2-regularized MLPs with polynomial logistic regression on a synthetic nonlinear classification problem.
-- `ML3_Task3.ipynb` is retained as part of the original assignment submission and is not the main project surface.
+The other two notebooks contain the remaining assignment work: regularized MLP comparisons in `ml_assignment3_part2.ipynb` and the original Task 3 submission in `ML3_Task3.ipynb`.
